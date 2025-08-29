@@ -1,0 +1,134 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        tools: composer, phpcs
+        
+    - name: Cache Composer dependencies
+      uses: actions/cache@v3
+      with:
+        path: /tmp/composer-cache
+        key: ${{ runner.os }}-${{ hashFiles('**/composer.lock') }}
+        
+    - name: Install dependencies
+      run: |
+        if [ -f composer.json ]; then
+          composer install --prefer-dist --no-progress
+        fi
+        
+    - name: Validate PHP syntax
+      run: |
+        find . -name "*.php" -not -path "./vendor/*" -not -path "./node_modules/*" -exec php -l {} \; | tee php-lint.log
+        if grep -q "Parse error" php-lint.log; then
+          echo "❌ Erros de sintaxe PHP encontrados!"
+          exit 1
+        else
+          echo "✅ Sintaxe PHP válida"
+        fi
+        
+    - name: WordPress Coding Standards
+      run: |
+        if [ -f composer.json ] && [ -f vendor/bin/phpcs ]; then
+          vendor/bin/phpcs --standard=WordPress --ignore=vendor/,node_modules/ --extensions=php .
+        else
+          echo "ℹ️  PHPCS não configurado, pulando verificação de coding standards"
+        fi
+      continue-on-error: true
+      
+    - name: Security Check
+      run: |
+        echo "🔍 Verificando por padrões de segurança..."
+        
+        # Verificar se wp-config.php não está sendo commitado
+        if [ -f wp-config.php ]; then
+          echo "⚠️  ATENÇÃO: wp-config.php encontrado no repositório!"
+          echo "Este arquivo não deveria estar versionado por motivos de segurança."
+        fi
+        
+        # Verificar por credenciais hardcoded
+        if grep -r -i "password\s*=" . --include="*.php" --exclude-dir=vendor --exclude-dir=node_modules; then
+          echo "⚠️  ATENÇÃO: Possíveis credenciais hardcoded encontradas!"
+        fi
+        
+        # Verificar por debug habilitado
+        if grep -r "WP_DEBUG.*true" . --include="*.php" --exclude-dir=vendor; then
+          echo "⚠️  ATENÇÃO: WP_DEBUG habilitado encontrado!"
+        fi
+        
+    - name: File Size Check
+      run: |
+        echo "📊 Verificando tamanho dos arquivos..."
+        find . -name "*.php" -o -name "*.js" -o -name "*.css" -o -name "*.jpg" -o -name "*.png" -o -name "*.gif" | \
+        xargs ls -la | \
+        awk '{if($5 > 1048576) print "⚠️  Arquivo grande (>1MB): " $9 " - " $5 " bytes"}'
+        
+    - name: Structure Validation
+      run: |
+        echo "🏗️  Validando estrutura do projeto..."
+        
+        # Verificar se é um projeto WordPress válido
+        if [ ! -f wp-load.php ] && [ ! -f index.php ]; then
+          echo "⚠️  Este não parece ser um projeto WordPress válido"
+        fi
+        
+        # Verificar estrutura básica
+        directories=("wp-content" "wp-admin" "wp-includes")
+        for dir in "${directories[@]}"; do
+          if [ -d "$dir" ]; then
+            echo "✅ Diretório encontrado: $dir"
+          else
+            echo "ℹ️  Diretório não encontrado: $dir"
+          fi
+        done
+        
+    - name: PR Info
+      run: |
+        echo "📋 Informações do Pull Request:"
+        echo "- Branch origem: ${{ github.head_ref }}"
+        echo "- Branch destino: ${{ github.base_ref }}"
+        echo "- Autor: ${{ github.actor }}"
+        echo "- Commit SHA: ${{ github.sha }}"
+        
+    - name: Comment PR
+      if: always()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { owner, repo, number } = context.issue;
+          const message = `
+          ## 🔍 Validação do PR
+          
+          ✅ **Validações executadas:**
+          - Sintaxe PHP
+          - Estrutura do projeto
+          - Verificação de segurança
+          - Tamanho de arquivos
+          
+          📊 **Status:** ${{ job.status }}
+          
+          🔗 **Logs completos:** [Ver na aba Actions](https://github.com/${owner}/${repo}/actions/runs/${{ github.run_id }})
+          
+          ---
+          *Validação automática via GitHub Actions*
+          `;
+          
+          await github.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number: number,
+            body: message
+          });

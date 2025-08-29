@@ -1,0 +1,166 @@
+name: Deploy WordPress
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Job para validações e testes
+  validate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        tools: composer
+        
+    - name: Validate PHP syntax
+      run: find . -name "*.php" -exec php -l {} \;
+      
+    - name: Check WordPress coding standards (if composer.json exists)
+      run: |
+        if [ -f composer.json ]; then
+          composer install --no-dev --optimize-autoloader
+          if [ -f vendor/bin/phpcs ]; then
+            vendor/bin/phpcs --standard=WordPress --ignore=vendor/ .
+          fi
+        fi
+
+  # Job para deploy em desenvolvimento
+  deploy-develop:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: development
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        
+    - name: Add server to known hosts
+      run: |
+        ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Create deployment package
+      run: |
+        tar -czf deploy.tar.gz \
+          --exclude='.git' \
+          --exclude='.github' \
+          --exclude='node_modules' \
+          --exclude='*.log' \
+          --exclude='.env' \
+          --exclude='wp-config.php' \
+          .
+          
+    - name: Upload and deploy to development
+      run: |
+        scp deploy.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.HOST }}:/tmp/
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.HOST }} << 'EOF'
+          cd /home/baziwebc/buscacamboriu.com.br
+          
+          # Backup atual
+          if [ -d "backup" ]; then
+            rm -rf backup_old
+            mv backup backup_old
+          fi
+          mkdir -p backup
+          cp -r * backup/ 2>/dev/null || true
+          
+          # Deploy dos novos arquivos
+          tar -xzf /tmp/deploy.tar.gz
+          rm /tmp/deploy.tar.gz
+          
+          # Configurar permissões
+          find . -type d -exec chmod 755 {} \;
+          find . -type f -exec chmod 644 {} \;
+          chmod 600 wp-config.php 2>/dev/null || true
+          
+          echo "✅ Deploy para desenvolvimento concluído em $(date)"
+        EOF
+
+  # Job para deploy em produção
+  deploy-production:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        
+    - name: Add server to known hosts
+      run: |
+        ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Create deployment package
+      run: |
+        tar -czf deploy.tar.gz \
+          --exclude='.git' \
+          --exclude='.github' \
+          --exclude='node_modules' \
+          --exclude='*.log' \
+          --exclude='.env' \
+          --exclude='wp-config.php' \
+          --exclude='scripts/deploy-dev.sh' \
+          .
+          
+    - name: Deploy to production with maintenance mode
+      run: |
+        scp deploy.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.HOST }}:/tmp/
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.HOST }} << 'EOF'
+          cd /home/baziwebc/buscacamboriu.com.br
+          
+          # Ativar modo manutenção
+          echo "<?php \$upgrading = time(); ?>" > .maintenance
+          
+          # Backup completo antes do deploy
+          BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
+          mkdir -p $BACKUP_DIR
+          cp -r * $BACKUP_DIR/ 2>/dev/null || true
+          
+          # Deploy dos novos arquivos
+          tar -xzf /tmp/deploy.tar.gz
+          rm /tmp/deploy.tar.gz
+          
+          # Configurar permissões
+          find . -type d -exec chmod 755 {} \;
+          find . -type f -exec chmod 644 {} \;
+          chmod 600 wp-config.php 2>/dev/null || true
+          
+          # Remover modo manutenção
+          rm -f .maintenance
+          
+          # Limpar cache se existir
+          if [ -d "wp-content/cache" ]; then
+            rm -rf wp-content/cache/*
+          fi
+          
+          echo "✅ Deploy para produção concluído em $(date)"
+          echo "📦 Backup criado em: $BACKUP_DIR"
+        EOF
+        
+    - name: Notification
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "🚀 Deploy em produção realizado com sucesso!"
+        else
+          echo "❌ Falha no deploy de produção"
+        fi
