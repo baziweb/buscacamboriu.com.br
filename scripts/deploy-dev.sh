@@ -8,7 +8,7 @@ set -e
 echo "🚀 Iniciando deploy para desenvolvimento..."
 
 # Configurações
-REMOTE_HOST="109.106.250.206"
+REMOTE_HOST="cpl27.main-hosting.eu"
 REMOTE_USER="baziwebc"
 REMOTE_PATH="/home/baziwebc/buscacamboriu.com.br"
 LOCAL_PATH="."
@@ -43,11 +43,11 @@ tar -czf /tmp/deploy-dev.tar.gz \
 
 # Upload do arquivo
 log "📤 Enviando arquivos para o servidor..."
-scp /tmp/deploy-dev.tar.gz $REMOTE_USER@$REMOTE_HOST:/tmp/
+scp -P 65002 /tmp/deploy-dev.tar.gz $REMOTE_USER@$REMOTE_HOST:/tmp/
 
 # Executar deploy no servidor
 log "🔧 Executando deploy no servidor..."
-ssh $REMOTE_USER@$REMOTE_HOST << 'EOF'
+ssh -p 65002 $REMOTE_USER@$REMOTE_HOST << 'EOF'
     cd /home/baziwebc/buscacamboriu.com.br
     
     # Backup dos arquivos atuais

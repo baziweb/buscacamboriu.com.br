@@ -6,7 +6,7 @@
 echo "🔍 Verificando conectividade com o servidor..."
 
 # Configurações
-REMOTE_HOST="109.106.250.206"
+REMOTE_HOST="cpl27.main-hosting.eu"
 REMOTE_USER="baziwebc"
 REMOTE_PATH="/home/baziwebc/buscacamboriu.com.br"
 
@@ -17,7 +17,7 @@ log() {
 
 # Verificar se consegue conectar via SSH
 log "🔗 Testando conexão SSH..."
-if ssh -o ConnectTimeout=10 -o BatchMode=yes $REMOTE_USER@$REMOTE_HOST exit; then
+if ssh -p 65002 -o ConnectTimeout=10 -o BatchMode=yes $REMOTE_USER@$REMOTE_HOST exit; then
     log "✅ Conexão SSH bem-sucedida"
 else
     log "❌ Falha na conexão SSH"
@@ -30,7 +30,7 @@ fi
 
 # Verificar diretório no servidor
 log "📁 Verificando diretório do projeto..."
-ssh $REMOTE_USER@$REMOTE_HOST << EOF
+ssh -p 65002 $REMOTE_USER@$REMOTE_HOST << EOF
     if [ -d "$REMOTE_PATH" ]; then
         echo "✅ Diretório existe: $REMOTE_PATH"
         echo "📊 Conteúdo do diretório:"

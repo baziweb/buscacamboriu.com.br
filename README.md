@@ -37,8 +37,10 @@ Acesse `Settings > Secrets and variables > Actions` e adicione:
 ```
 SSH_PRIVATE_KEY: Sua chave SSH privada
 SSH_USER: baziwebc
-HOST: 109.106.250.206
+HOST: cpl27.main-hosting.eu
 ```
+
+**⚠️ Importante:** O servidor usa a porta SSH customizada **65002**. Certifique-se de configurar sua chave SSH corretamente.
 
 ### 2. Gerar e Configurar Chave SSH
 
@@ -47,7 +49,7 @@ HOST: 109.106.250.206
 ssh-keygen -t ed25519 -C "deploy-buscacamboriu"
 
 # Copie a chave pública para o servidor
-ssh-copy-id baziwebc@109.106.250.206
+ssh-copy-id -p 65002 baziwebc@cpl27.main-hosting.eu
 
 # Adicione a chave privada nos secrets do GitHub
 cat ~/.ssh/id_ed25519 # Cole este conteúdo no secret SSH_PRIVATE_KEY
@@ -100,10 +102,10 @@ Os logs ficam disponíveis na aba "Actions" do GitHub.
 ### Verificação de Status
 ```bash
 # Verificar status do servidor
-ssh baziwebc@109.106.250.206 'cd /home/baziwebc/buscacamboriu.com.br && ls -la'
+ssh -p 65002 baziwebc@cpl27.main-hosting.eu 'cd /home/baziwebc/buscacamboriu.com.br && ls -la'
 
 # Verificar logs de erro do WordPress
-ssh baziwebc@109.106.250.206 'tail -f /home/baziwebc/buscacamboriu.com.br/wp-content/debug.log'
+ssh -p 65002 baziwebc@cpl27.main-hosting.eu 'tail -f /home/baziwebc/buscacamboriu.com.br/wp-content/debug.log'
 ```
 
 ## 🔧 Scripts Disponíveis
@@ -129,16 +131,16 @@ ssh baziwebc@109.106.250.206 'tail -f /home/baziwebc/buscacamboriu.com.br/wp-con
 ### Site em manutenção?
 ```bash
 # Remover modo manutenção manualmente
-ssh baziwebc@109.106.250.206 'rm -f /home/baziwebc/buscacamboriu.com.br/.maintenance'
+ssh -p 65002 baziwebc@cpl27.main-hosting.eu 'rm -f /home/baziwebc/buscacamboriu.com.br/.maintenance'
 ```
 
 ### Restaurar backup?
 ```bash
 # Listar backups disponíveis
-ssh baziwebc@109.106.250.206 'ls -la /home/baziwebc/buscacamboriu.com.br/backups/'
+ssh -p 65002 baziwebc@cpl27.main-hosting.eu 'ls -la /home/baziwebc/buscacamboriu.com.br/backups/'
 
 # Restaurar backup específico
-ssh baziwebc@109.106.250.206 'cd /home/baziwebc/buscacamboriu.com.br && cp -r backups/prod-YYYYMMDD_HHMMSS/* .'
+ssh -p 65002 baziwebc@cpl27.main-hosting.eu 'cd /home/baziwebc/buscacamboriu.com.br && cp -r backups/prod-YYYYMMDD_HHMMSS/* .'
 ```
 
 ## 🌐 URLs

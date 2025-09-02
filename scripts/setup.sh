@@ -103,12 +103,12 @@ echo "📋 Próximos passos:"
 echo
 echo "1. 🔑 Configure sua chave SSH:"
 echo "   ssh-keygen -t ed25519 -C 'deploy-buscacamboriu'"
-echo "   ssh-copy-id baziwebc@109.106.250.206"
+echo "   ssh-copy-id -p 65002 baziwebc@cpl27.main-hosting.eu"
 echo
 echo "2. 🔒 Configure os secrets no GitHub:"
 echo "   - SSH_PRIVATE_KEY (conteúdo da chave privada)"
 echo "   - SSH_USER: baziwebc"
-echo "   - HOST: 109.106.250.206"
+echo "   - HOST: cpl27.main-hosting.eu"
 echo
 echo "3. 🌍 Configure os environments no GitHub:"
 echo "   - production (protegida com branch main)"
